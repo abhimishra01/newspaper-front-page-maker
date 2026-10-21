@@ -10,6 +10,7 @@ import { addPngText, pngSize } from './png.js';
 import { buildPdf } from './pdf.js';
 import { fileName } from './filename.js';
 import { samplePicture } from './sample.js';
+import { encodeState, decodeState } from './link.js';
 
 const KEY = 'bm.newspaper.v1';
 const NOTE = 'Novelty print. Fictional. Made with bingemind.com/newspaper-front-page-maker';
@@ -36,17 +37,36 @@ function fresh(presetId = 'birthday') {
   };
 }
 
-function load() {
-  try {
-    const s = JSON.parse(localStorage.getItem(KEY) || 'null');
-    if (s && s.v === 1 && s.fields && PRESETS[s.preset] && TEMPLATE_IDS.includes(s.template) && FORMATS[s.format]) {
-      const base = fresh(s.preset);
-      const fields = { ...base.fields };
-      for (const f of FIELD_IDS) if (typeof s.fields[f] === 'string') fields[f] = s.fields[f].slice(0, 5000);
-      return { ...base, ...s, fields, gen: { ...base.gen, ...(s.gen || {}) }, opts: { ...base.opts, ...(s.opts || {}) } };
+// Saved or shared state -> a full, checked state, or null.
+function restore(s) {
+  if (s && s.v === 1 && s.fields && PRESET_IDS.includes(s.preset) && TEMPLATE_IDS.includes(s.template) && FORMAT_IDS.includes(s.format)) {
+    // Only known keys and plain strings are kept: a shared link comes from someone else.
+    const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : null);
+    const base = fresh(s.preset);
+    const fields = { ...base.fields }, gen = { ...base.gen };
+    for (const f of FIELD_IDS) {
+      fields[f] = str(s.fields[f], 5000) ?? fields[f];
+      gen[f] = str(s.gen?.[f], 5000) ?? gen[f];
     }
-  } catch {}
-  return fresh();
+    const pick = (v, ok, dflt) => (ok.includes(v) ? v : dflt);
+    const o = s.opts || {};
+    return {
+      ...base, preset: s.preset, template: s.template, format: s.format, fields, gen,
+      name: str(s.name, 60) ?? base.name, n: str(s.n, 8) ?? base.n, nameTouched: !!s.nameTouched,
+      iso: /^\d{4}-\d{2}-\d{2}$/.test(s.iso) ? s.iso : base.iso,
+      opts: {
+        face: pick(o.face, ['auto', 'old', 'serif', 'sans'], 'auto'),
+        paper: pick(o.paper, ['tint', 'white'], 'tint'),
+        look: pick(o.look, ['auto', 'color', 'bw', 'halftone'], 'auto'),
+        notice: o.notice !== false,
+      },
+    };
+  }
+  return null;
+}
+
+function load() {
+  try { return restore(JSON.parse(localStorage.getItem(KEY) || 'null')) || fresh(); } catch { return fresh(); }
 }
 
 let saveTimer = 0;
@@ -466,6 +486,15 @@ function wireExport() {
     window.addEventListener('afterprint', clean);
     window.print();
   }));
+  $('np-link').addEventListener('click', () => busy($('np-link'), 'Copying…', async () => {
+    const link = location.origin + location.pathname + '#p=' + (await encodeState(S));
+    try {
+      await navigator.clipboard.writeText(link);
+      status('Link copied. It holds your words and settings, not your photos.');
+    } catch {
+      window.prompt('Copy this link. It holds your words and settings, not your photos.', link);
+    }
+  }));
   const share = $('np-share');
   try {
     const probe = new File([new Uint8Array(1)], 'p.png', { type: 'image/png' });
@@ -576,6 +605,13 @@ async function loadFont() {
 
 export async function start() {
   S = load();
+  // A shared link opens its words on this device, then the address is cleaned up.
+  const shared = location.hash.startsWith('#p=') ? restore(await decodeState(location.hash.slice(3))) : null;
+  if (shared) {
+    S = shared;
+    history.replaceState(null, '', location.pathname + location.search);
+    save();
+  }
   syncControls();
   photos.main = samplePicture();
   photoUI();
@@ -583,6 +619,7 @@ export async function start() {
   await loadFont();
   draw();
   $('tool').dataset.ready = 'true';
+  if (shared) status('Opened a shared front page. Add your own photo if you like.');
   // When the font arrives late, measure again.
   document.fonts?.ready?.then(() => { mcache = new Map(); render(); });
 }

@@ -9,7 +9,7 @@ const PHOTO_MARK = 'PHOTO-MARKER-9d41'; // inside a comment segment of the fixtu
 const TEXT_MARK = 'TEXT-MARKER-51c8';
 const srv = await serve();
 const browser = await launch();
-const ctx = await browser.newContext({ acceptDownloads: true, locale: 'en-US' });
+const ctx = await browser.newContext({ acceptDownloads: true, locale: 'en-US', permissions: ['clipboard-read', 'clipboard-write'] });
 const page = await ctx.newPage();
 const seen = [];
 ctx.on('request', (r) => seen.push({ url: r.url(), method: r.method(), headers: r.headers(), body: r.postData() || '' }));
@@ -35,6 +35,17 @@ await page.waitForFunction(() => window.__printed === 1);
 await page.check('input[name="np-format"][value="story"]', { force: true });
 const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#np-png')]);
 await dl.path();
+// Copy link puts the words after "#", which the browser never sends. Opening it must not leak them either.
+await page.click('#np-link');
+await page.waitForFunction(() => /Link copied/.test(document.getElementById('np-status').textContent));
+const link = await page.evaluate(() => navigator.clipboard.readText());
+assert.ok(link.includes('#p='), 'link has the words after #');
+const page2 = await ctx.newPage();
+page2.on('pageerror', (e) => errors.push(String(e)));
+await page2.goto(link);
+await page2.waitForSelector('#tool[data-ready="true"]');
+assert.ok((await page2.inputValue('#np-f-headline')).includes(TEXT_MARK), 'shared link opens the words');
+assert.ok(!page2.url().includes('#p='), 'address cleaned up after opening');
 await page.waitForTimeout(400);
 
 const host = new URL(srv.url).host;

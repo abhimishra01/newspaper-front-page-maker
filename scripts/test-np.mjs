@@ -8,6 +8,7 @@ import { buildPdf } from '../src/lib/np/pdf.js';
 import { fileName } from '../src/lib/np/filename.js';
 import { PRESETS, PRESET_IDS, SURPRISE, BLOCKED, FIELD_IDS, presetFields, swapValue, surprise, fill } from '../src/lib/np/presets.js';
 import { layout, TEMPLATE_IDS } from '../src/lib/np/layout.js';
+import { encodeState, decodeState } from '../src/lib/np/link.js';
 
 let passed = 0;
 const test = (name, fn) => {
@@ -309,5 +310,20 @@ test('layout: notice can be turned off, and long names stay on the page', () => 
     }
   }
 });
+
+// 10. Share link (async)
+await (async () => {
+  try {
+    const state = { v: 1, preset: 'birthday', fields: { headline: 'Ünïcode 🎂 ' + 'x'.repeat(3000) }, opts: { face: 'old' } };
+    const code = await encodeState(state);
+    assert.match(code, /^[zj][A-Za-z0-9_-]+$/);
+    assert.ok(code.length < 600, 'repeated text should compress');
+    assert.deepEqual(await decodeState(code), state);
+    assert.equal(await decodeState('zNOT-VALID'), null);
+    assert.equal(await decodeState('q123'), null);
+    assert.equal(await decodeState(''), null);
+    passed++;
+  } catch (e) { console.error(`FAIL share link\n  ${e.message}`); process.exitCode = 1; }
+})();
 
 console.log(`${passed} tests passed${process.exitCode ? ', some FAILED' : ''}`);
