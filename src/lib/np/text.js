@@ -120,11 +120,6 @@ export function flow(text, cols, fontStr, size, lh, measure, more = '') {
   return { placed, cut, usedH };
 }
 
-/** Height a block of text needs at a given size and width. */
-export function blockHeight(text, w, fontStr, size, lh, measure) {
-  return wrap(text, w, fontStr, measure).length * size * lh;
-}
-
 /**
  * Shorten columns to a common bottom line so the text is spread evenly (newspaper style),
  * without cutting text that fits. Returns new column boxes.
