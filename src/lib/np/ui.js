@@ -505,8 +505,9 @@ function wireExport() {
   share.addEventListener('click', () => busy(share, 'Preparing…', async () => {
     const bytes = await pngBytes(S.format);
     const file = new File([bytes], fileName(S.fields.paper, S.format, 'png'), { type: 'image/png' });
+    status('Choose where to share it in the menu.');
     try { await navigator.share({ files: [file], title: S.fields.paper }); status('Shared.'); }
-    catch (e) { if (e.name !== 'AbortError') throw e; }
+    catch (e) { if (e.name === 'AbortError') status(''); else throw e; }
   }));
 }
 
