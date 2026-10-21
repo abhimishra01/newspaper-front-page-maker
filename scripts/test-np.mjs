@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { FORMATS, FORMAT_IDS, designHeight, defaultFormat } from '../src/lib/np/formats.js';
 import { wrap, fitText, flow, paragraphs, balance } from '../src/lib/np/text.js';
 import { parseISODate, formatDateLine, toISODate } from '../src/lib/np/date.js';
-import { addPngText, crc32, pngSize } from '../src/lib/np/png.js';
+import { addPngText, addPngDpi, crc32, pngSize } from '../src/lib/np/png.js';
 import { buildPdf } from '../src/lib/np/pdf.js';
 import { fileName } from '../src/lib/np/filename.js';
 import { PRESETS, PRESET_IDS, SURPRISE, BLOCKED, FIELD_IDS, presetFields, swapValue, surprise, fill } from '../src/lib/np/presets.js';
@@ -98,6 +98,14 @@ test('PNG tEXt chunk after IHDR with a correct CRC', () => {
   assert.deepEqual([...out.subarray(45 + len)], [...png.subarray(33)]);
   assert.deepEqual(pngSize(out), { w: 1, h: 1 });
   assert.throws(() => addPngText(new Uint8Array(40), 'a', 'b'));
+  // pHYs: 300 DPI = 300 / 0.0254 = 11811.02 -> 11811 pixels per meter, unit 1 (meter).
+  const d = addPngDpi(png, 300);
+  const dd = new DataView(d.buffer);
+  assert.equal(dd.getUint32(33), 9);
+  assert.equal(Buffer.from(d.subarray(37, 41)).toString('latin1'), 'pHYs');
+  assert.deepEqual([dd.getUint32(41), dd.getUint32(45), d[49]], [11811, 11811, 1]);
+  assert.equal(dd.getUint32(50), crc32(d, 37, 50));
+  assert.deepEqual([...d.subarray(54)], [...png.subarray(33)]);
 });
 
 // 4. Text wrap

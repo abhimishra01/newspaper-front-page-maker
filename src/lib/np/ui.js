@@ -6,7 +6,7 @@ import { paint } from './draw.js';
 import { loadPhoto } from './photo.js';
 import { PRESETS, PRESET_IDS, FIELDS, FIELD_IDS, presetFields, swapValue, surprise } from './presets.js';
 import { parseISODate, formatDateLine, toISODate } from './date.js';
-import { addPngText, pngSize } from './png.js';
+import { addPngText, addPngDpi, pngSize } from './png.js';
 import { buildPdf } from './pdf.js';
 import { fileName } from './filename.js';
 import { samplePicture } from './sample.js';
@@ -428,7 +428,9 @@ async function pngBytes(format) {
   const c = await renderFull(format);
   try {
     const b = new Uint8Array(await (await toBlob(c, 'image/png')).arrayBuffer());
-    return addPngText(b, 'Comment', NOTE);
+    const withNote = addPngText(b, 'Comment', NOTE);
+    // Print sizes carry 300 DPI, so a photo app prints them at 8.5 x 11 in or A4, not poster size.
+    return FORMATS[format].print ? addPngDpi(withNote, 300) : withNote;
   } finally { c.width = 0; c.height = 0; }
 }
 

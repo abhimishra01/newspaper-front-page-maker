@@ -95,6 +95,7 @@ await step('PNG at every size has the right pixels and the text chunk', async ()
     assert.deepEqual(pngWH(bytes), wh, f);
     assert.ok(name.endsWith(`-${f}.png`), name);
     assert.ok(bytes.includes(Buffer.from('tEXtComment\0Novelty print. Fictional.')), 'tEXt chunk');
+    assert.equal(bytes.includes(Buffer.from('pHYs')), f === 'letter' || f === 'a4', 'pHYs only on print sizes');
     assert.equal(await page.isVisible('#np-pdf'), f === 'letter' || f === 'a4');
   }
 });
