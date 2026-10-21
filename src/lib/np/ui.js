@@ -214,12 +214,15 @@ function applyPreset(id) {
   render();
 }
 
+// Name and number swaps are rebuilt from a snapshot taken when the box got focus, so the
+// in-between values while typing ("I", "Iv" on the way to "Ivy") never touch the user's own text.
+let snap = null;
 function swap(kind, value) {
-  const from = kind === 'name' ? S.name : S.n;
-  if (from === value) return;
-  const name = kind === 'name' ? value : S.name;
-  const n = kind === 'n' ? value : S.n;
-  const r = swapValue(S.fields, S.gen, S.preset, name, n, from, value);
+  if (!snap) snap = { fields: { ...S.fields }, gen: { ...S.gen }, name: S.name, n: S.n };
+  const from = kind === 'name' ? snap.name : snap.n;
+  const name = kind === 'name' ? value : snap.name;
+  const n = kind === 'n' ? value : snap.n;
+  const r = from === value ? { fields: { ...snap.fields }, gen: { ...snap.gen } } : swapValue(snap.fields, snap.gen, S.preset, name, n, from, value);
   r.fields.date = S.fields.date;
   Object.assign(S, { name, n, fields: r.fields, gen: r.gen });
   if (kind === 'name') S.nameTouched = true;
@@ -262,14 +265,16 @@ function wirePhotoDrag() {
     if (!b) return;
     const slot = b.dataset.id.split(':')[1];
     if (!photos[slot]) return;
-    drag = { slot, x: e.clientX, y: e.clientY, fx: photos[slot].fx, fy: photos[slot].fy, w: b.offsetWidth, h: b.offsetHeight, moved: false, id: e.pointerId };
-    b.setPointerCapture(e.pointerId);
-    e.preventDefault();
+    // On touch screens a swipe over the photo scrolls the page. A tap turns on move mode first.
+    const touch = e.pointerType === 'touch' && !b.classList.contains('is-moving');
+    drag = { slot, b, touch, x: e.clientX, y: e.clientY, fx: photos[slot].fx, fy: photos[slot].fy, w: b.offsetWidth, h: b.offsetHeight, moved: false, id: e.pointerId };
+    if (!touch) { b.setPointerCapture(e.pointerId); e.preventDefault(); }
   });
   box.addEventListener('pointermove', (e) => {
     if (!drag || e.pointerId !== drag.id) return;
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+    if (drag.touch) return;
     const p = photos[drag.slot];
     p.fx = Math.max(-1, Math.min(1, drag.fx - (2 * dx) / drag.w));
     p.fy = Math.max(-1, Math.min(1, drag.fy - (2 * dy) / drag.h));
@@ -279,14 +284,26 @@ function wirePhotoDrag() {
     if (!drag || e.pointerId !== drag.id) return;
     const d = drag;
     drag = null;
+    if (d.touch || (e.pointerType === 'touch' && !d.moved)) {
+      if (e.type === 'pointerup' && !d.moved) {
+        const on = d.b.classList.toggle('is-moving');
+        status(on ? 'Move mode: drag the photo to move it. Tap it again when done.' : 'Photo placed.');
+      }
+      return;
+    }
     if (!d.moved) {
-      // A tap on the photo opens its controls.
+      // A click on the photo opens its controls.
       const el = document.querySelector(`.np-photo[data-slot="${d.slot}"]`);
       el.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
       el.querySelector('[data-role="zoom"]').focus({ preventScroll: true });
     }
   };
   box.addEventListener('pointerup', end);
+  // Tapping anywhere else ends move mode.
+  document.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('.np-hit-photo')) return;
+    for (const b of document.querySelectorAll('.np-hit-photo.is-moving')) b.classList.remove('is-moving');
+  });
   box.addEventListener('pointercancel', end);
   box.addEventListener('keydown', (e) => {
     const b = e.target.closest('.np-hit-photo');
@@ -436,8 +453,12 @@ function wire() {
   for (const r of document.querySelectorAll('input[name="np-occasion"]')) r.addEventListener('change', () => applyPreset(r.value));
   for (const r of document.querySelectorAll('input[name="np-template"]')) r.addEventListener('change', () => { S.template = r.value; save(); render(); });
   for (const r of document.querySelectorAll('input[name="np-format"]')) r.addEventListener('change', () => { S.format = r.value; formatButtons(); save(); render(); });
-  $('np-name').addEventListener('input', (e) => swap('name', e.target.value.trim() ? e.target.value : ''));
-  $('np-num').addEventListener('input', (e) => swap('n', e.target.value.trim()));
+  for (const id of ['np-name', 'np-num']) {
+    const el = $(id);
+    el.addEventListener('focus', () => { snap = null; });
+    el.addEventListener('blur', () => { snap = null; });
+    el.addEventListener('input', () => swap(id === 'np-name' ? 'name' : 'n', el.value.trim() ? (id === 'np-name' ? el.value : el.value.trim()) : ''));
+  }
   $('np-date').addEventListener('change', (e) => {
     const d = parseISODate(e.target.value);
     if (!d) return;

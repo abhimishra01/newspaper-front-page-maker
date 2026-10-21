@@ -60,6 +60,28 @@ await step('name swap changes every field', async () => {
   assert.match(await page.inputValue('#np-f-volume'), /Vol\. 50/);
 });
 
+await step('typing a name key by key never changes partial words in edited text', async () => {
+  if (!(await page.$eval('#np-all', (d) => d.open))) await page.click('#np-all summary');
+  await page.fill('#np-name', 'Sam');
+  await page.locator('#np-name').blur();
+  await page.fill('#np-f-body', 'I have no idea. An apple. Sam rocks. 4 cakes.');
+  await page.fill('#np-num', '40');
+  await page.locator('#np-num').blur();
+  await page.click('#np-name', { clickCount: 3 });
+  await page.keyboard.press('Backspace');
+  await page.keyboard.type('Ivy', { delay: 20 });
+  assert.equal(await page.inputValue('#np-f-body'), 'I have no idea. An apple. Ivy rocks. 4 cakes.');
+  await page.click('#np-name', { clickCount: 3 });
+  await page.keyboard.type('Andy', { delay: 20 });
+  assert.equal(await page.inputValue('#np-f-body'), 'I have no idea. An apple. Andy rocks. 4 cakes.');
+  await page.click('#np-num', { clickCount: 3 });
+  await page.keyboard.press('Backspace');
+  await page.keyboard.type('45', { delay: 20 });
+  assert.equal(await page.inputValue('#np-f-body'), 'I have no idea. An apple. Andy rocks. 4 cakes.');
+  assert.match(await page.inputValue('#np-f-volume'), /Vol\. 45/);
+  await page.locator('#np-num').blur();
+});
+
 await step('date picker fills the date line from local parts', async () => {
   await page.fill('#np-date', '2026-10-21');
   await page.dispatchEvent('#np-date', 'change');
@@ -154,6 +176,14 @@ await step('phone: no sideways scroll, A4 for en-GB, tap targets work', async ()
   assert.equal(await p2.isVisible('#np-editor'), true);
   const fs16 = await p2.$eval('#np-editor', (e) => parseFloat(getComputedStyle(e).fontSize));
   assert.ok(fs16 >= 16, 'editor font at least 16px');
+  await p2.click('#np-editor-done');
+  // A swipe over the photo scrolls the page; a tap turns on move mode, a second tap ends it.
+  assert.equal(await p2.$eval('.np-hit[data-id="photo:main"]', (e) => getComputedStyle(e).touchAction), 'pan-y pinch-zoom');
+  await p2.tap('.np-hit[data-id="photo:main"]');
+  await p2.waitForFunction(() => document.querySelector('.np-hit[data-id="photo:main"]').classList.contains('is-moving'));
+  assert.equal(await p2.$eval('.np-hit[data-id="photo:main"]', (e) => getComputedStyle(e).touchAction), 'none');
+  await p2.tap('.np-hit[data-id="photo:main"]');
+  await p2.waitForFunction(() => !document.querySelector('.np-hit[data-id="photo:main"]').classList.contains('is-moving'));
   await c2.close();
 });
 
