@@ -1,5 +1,5 @@
 # Code review: maintainer lens (newspaper-front-page-maker)
-Reviewer: Lisbeth (independent). Date: 2026-10-21. Base: cfe54a0. Fixes: 145e8e2, 3ee0862, 8be8858, 6107808.
+Reviewer: Lisbeth (independent). Date: 2026-10-21. Base: cfe54a0. Fixes: 145e8e2, 3ee0862, 8be8858, 6107808, ed0d4ff, c8cb2c5.
 
 **Verdict:** Ownable for years. Pure layout core, injected `measure`, Node known-answer tests plus two real-browser gates (network privacy, UI). No dependency risk (no runtime libraries; own PDF and PNG writers). 0 must-fix open.
 
@@ -7,6 +7,7 @@ Reviewer: Lisbeth (independent). Date: 2026-10-21. Base: cfe54a0. Fixes: 145e8e2
 |---|---|---|---|---|
 | should | scripts/e2e-lib.mjs:33 | Browser tests could bind only 4983 to 4988 | Other agents share the machine; a reviewer or CI on other ports could not run the release gate | Fixed: `NP_PORTS` env list, default unchanged |
 | should | src/lib/np/ui.js:41 (`restore`) | New share link reads state from someone else; the old loader spread every key and trusted `PRESETS[s.preset]` (`constructor` passes) | Untrusted input must not set unknown keys or non-strings that later crash name swap | Fixed: own-key id lists, strings only, option whitelist, length caps |
+| should | src/layouts/Base.astro, ui.js `start` | Copy link words sat in `location.href` until ui.js loaded; with GA4 or AdSense on, their scripts could read them | Privacy page promises the words reach no server | Fixed (ed0d4ff): inline head script takes `#p=` out before any other script; test checks the hash is gone at DOM ready |
 | should | src/lib/np/png.js | Print PNGs had no pHYs chunk | The site says 300 DPI; without pHYs photo apps assume 72 DPI and print a 35 inch page or scale it | Fixed: `addPngDpi` (11811 px/m) on Letter and A4, unit test plus UI check |
 | nice | src/lib/np/ui.js `swap` | Clear the Name box, leave it, then type a new name later: edited fields keep the blank (generated fields are fine) | Rare; snapshot logic only spans one focus | Open (P1). Keep the last non-empty name as `from` |
 | nice | src/lib/np/draw.js `grayOf` | Grayscale copy cached on the photo object, never freed | Fine today (photo objects are replaced); note for a photo strip in P1 | Open |
