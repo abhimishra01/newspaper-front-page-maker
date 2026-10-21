@@ -42,10 +42,15 @@ const link = await page.evaluate(() => navigator.clipboard.readText());
 assert.ok(link.includes('#p='), 'link has the words after #');
 const page2 = await ctx.newPage();
 page2.on('pageerror', (e) => errors.push(String(e)));
+// The address is cleaned before any other script runs (analytics or ads would read location.href).
+await page2.addInitScript(() => {
+  document.addEventListener('readystatechange', () => { if (document.readyState === 'interactive') window.__hashAtDomReady = location.hash; }, { once: true });
+});
 await page2.goto(link);
 await page2.waitForSelector('#tool[data-ready="true"]');
 assert.ok((await page2.inputValue('#np-f-headline')).includes(TEXT_MARK), 'shared link opens the words');
 assert.ok(!page2.url().includes('#p='), 'address cleaned up after opening');
+assert.equal(await page2.evaluate(() => window.__hashAtDomReady), '', 'hash removed before the page finished parsing');
 await page.waitForTimeout(400);
 
 const host = new URL(srv.url).host;

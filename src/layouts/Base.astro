@@ -30,6 +30,10 @@ const image = site.ogImage ? new URL(url(site.ogImage), Astro.site).href : '';
       (function(){var t;try{t=localStorage.getItem('theme')}catch(e){}
       if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}
       document.documentElement.dataset.theme=t})();
+      // A shared front page link keeps its words after "#p=". Take them out of the address before any
+      // other script (analytics or ads, when switched on) can read location.href. ui.js reads them here.
+      (function(){var h=location.hash;if(h.indexOf('#p=')===0){window.__npShared=h.slice(3);
+      try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}}})();
     </script>
     <title>{fullTitle}</title>
     <meta name="description" content={description} />

@@ -608,12 +608,11 @@ async function loadFont() {
 export async function start() {
   S = load();
   // A shared link opens its words on this device, then the address is cleaned up.
-  const shared = location.hash.startsWith('#p=') ? restore(await decodeState(location.hash.slice(3))) : null;
-  if (shared) {
-    S = shared;
-    history.replaceState(null, '', location.pathname + location.search);
-    save();
-  }
+  // Base.astro takes the code out of the address before any other script runs.
+  const code = window.__npShared || (location.hash.startsWith('#p=') ? location.hash.slice(3) : '');
+  const shared = code ? restore(await decodeState(code)) : null;
+  if (location.hash.startsWith('#p=')) history.replaceState(null, '', location.pathname + location.search);
+  if (shared) { S = shared; save(); }
   syncControls();
   photos.main = samplePicture();
   photoUI();
