@@ -195,3 +195,5 @@ textarea.ctl { padding: 8px 10px; line-height: 1.45; resize: vertical; }
   .np-print-area { display: block !important; }
   .np-print-area img { display: block; width: 100vw; height: 100vh; object-fit: contain; }
 }
+/* Date inputs move focus into their inner parts, so ring the box itself. */
+.ctl:focus-visible, input[type="date"].ctl:focus, input[type="date"].ctl:focus-within { outline: 3px solid var(--brand-ink); outline-offset: 2px; }

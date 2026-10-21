@@ -441,7 +441,6 @@ function vintage(P, d, o, photos) {
   const nCols = 4;
   const colW = (W - 2 * m - (nCols - 1) * g) / nCols;
   const bodyCols = side ? 3 : 4;
-  for (let i = 1; i < nCols; i++) P.line(m + i * (colW + g) - g / 2, y, m + i * (colW + g) - g / 2, bottom, ink, 0.6);
   const bodySize = print ? 14 : 16;
   const bodyFont = font(FONTS.serif, 400);
   const capF = font(FONTS.serif, 400, 'italic');
@@ -474,6 +473,11 @@ function vintage(P, d, o, photos) {
     if (has(d.caption)) P.block('caption', d.caption, m, yy, pw, 30, capF, 12, 15 / 12, ink, 'center');
   }
   if (byH) P.one('byline', d.byline, m, best.cols[0].y - byH, colW, font(FONTS.serif, 700), 14, ink, 'center', true);
+  // Column rules; the one between the two photo columns starts under the photo and caption.
+  for (let i = 1; i < nCols; i++) {
+    const top = i === 1 && photos.main ? y + best.ph + 6 + capH : y;
+    P.line(m + i * (colW + g) - g / 2, top, m + i * (colW + g) - g / 2, bottom, ink, 0.6);
+  }
   P.flowText('body', d.body, best.cols, bodyFont, best.size, 1.3, ink);
   if (side) {
     const sx = m + 3 * (colW + g);
