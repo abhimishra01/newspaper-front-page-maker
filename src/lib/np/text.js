@@ -121,3 +121,22 @@ export function flow(text, cols, fontStr, size, lh, measure) {
 export function blockHeight(text, w, fontStr, size, lh, measure) {
   return wrap(text, w, fontStr, measure).length * size * lh;
 }
+
+/**
+ * Shorten columns to a common bottom line so the text is spread evenly (newspaper style),
+ * without cutting text that fits. Returns new column boxes.
+ */
+export function balance(text, cols, fontStr, size, lh, measure) {
+  if (!cols.length) return cols;
+  const step = size * lh;
+  const bottom = Math.max(...cols.map((c) => c.y + c.h));
+  const top = Math.min(...cols.map((c) => c.y));
+  const at = (b) => cols.map((c) => ({ ...c, h: Math.max(0, b - c.y) }));
+  if (flow(text, cols, fontStr, size, lh, measure).cut) return cols;
+  let lo = top + step, hi = bottom;
+  while (hi - lo > step / 4) {
+    const mid = (lo + hi) / 2;
+    if (flow(text, at(mid), fontStr, size, lh, measure).cut) lo = mid; else hi = mid;
+  }
+  return at(hi);
+}

@@ -82,7 +82,7 @@ function drawText(ctx, op) {
     const natural = ctx.measureText(op.text).width;
     const extra = op.jw - natural;
     // Justify only when the gaps stay reasonable.
-    if (extra > 0 && extra < op.jw * 0.3) {
+    if (extra > 0 && extra < op.jw * 0.16 && extra / (words.length - 1) < op.jw * 0.06) {
       ctx.textAlign = 'left';
       const space = ctx.measureText(' ').width + extra / (words.length - 1);
       let cx = op.x;

@@ -2,6 +2,7 @@
 // Keep this file plain (no type-only syntax): scripts/deploy.mjs imports it directly.
 const cfg = {
   name: 'Newspaper Front Page Maker',          // shown in header, title, footer
+  shortName: 'Front Page Maker',               // header name on narrow phones
   domain: 'bingemind.com',                     // no https://, no www.
   cloudflareProject: 'newspaper-front-page-maker', // Cloudflare Pages project name (used by npm run deploy)
   keyword: 'newspaper generator with photo',   // main keyword

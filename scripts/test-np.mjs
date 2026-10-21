@@ -1,7 +1,7 @@
 // Known-answer tests for the newspaper maker core (no browser). Run: npm test
 import assert from 'node:assert/strict';
 import { FORMATS, FORMAT_IDS, designHeight, defaultFormat } from '../src/lib/np/formats.js';
-import { wrap, fitText, flow, paragraphs } from '../src/lib/np/text.js';
+import { wrap, fitText, flow, paragraphs, balance } from '../src/lib/np/text.js';
 import { parseISODate, formatDateLine, toISODate } from '../src/lib/np/date.js';
 import { addPngText, crc32, pngSize } from '../src/lib/np/png.js';
 import { buildPdf } from '../src/lib/np/pdf.js';
@@ -140,6 +140,19 @@ test('flow: columns of different widths, cut with ellipsis', () => {
   const ok = flow('short text', cols, f, 10, 1.3, measure);
   assert.equal(ok.cut, false);
   assert.equal(ok.placed.length, 1);
+});
+
+test('balance: columns share the text evenly and nothing is cut', () => {
+  const f = '400 10px serif';
+  const text = 'word '.repeat(60).trim();
+  const cols = [{ x: 0, y: 0, w: 100, h: 400 }, { x: 120, y: 0, w: 100, h: 400 }];
+  const b = balance(text, cols, f, 10, 1.3, measure);
+  const r = flow(text, b, f, 10, 1.3, measure);
+  assert.equal(r.cut, false);
+  assert.ok(Math.abs(r.usedH[0] - r.usedH[1]) <= 13 + 0.01, `uneven ${r.usedH}`);
+  // Text that does not fit is left alone.
+  const big = 'word '.repeat(2000).trim();
+  assert.deepEqual(balance(big, cols, f, 10, 1.3, measure), cols);
 });
 
 // 7. Date line

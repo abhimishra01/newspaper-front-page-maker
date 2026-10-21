@@ -1,179 +1,139 @@
 ---
-// The JSON diff tool. Markup only; the logic is in src/lib/jd/ui.js and the worker.
-// The section has a fixed minimum height from the first paint, so the page does not jump.
-const panes = [
-  { side: 'a', title: 'Original' },
-  { side: 'b', title: 'Changed' },
-];
+// The editor. The page is drawn on a canvas from src/lib/np/layout.js; ui.js wires the controls.
+import { PRESETS, PRESET_IDS, FIELDS } from '../lib/np/presets.js';
+import { FORMATS, FORMAT_IDS } from '../lib/np/formats.js';
+import { TEMPLATES } from '../lib/np/layout.js';
+import { url } from '../lib/url.ts';
 ---
-<section id="tool" class="jd" aria-label="JSON diff tool">
-  <div class="jd-bar" role="group" aria-label="Actions">
-    <button type="button" id="jd-sample" class="btn">Sample</button>
-    <button type="button" id="jd-swap" class="btn">Swap</button>
-    <button type="button" id="jd-clear" class="btn">Clear both</button>
-    <span class="jd-sep" aria-hidden="true"></span>
-    <label class="jd-field" for="jd-arrays">Arrays
-      <select id="jd-arrays" class="ctl">
-        <option value="auto">Auto</option>
-        <option value="position">By position</option>
-        <option value="key">By key</option>
-        <option value="order">Ignore order</option>
-      </select>
-    </label>
-    <label class="jd-field" id="jd-keywrap" for="jd-key" hidden>Key
-      <input id="jd-key" class="ctl" type="text" placeholder="id" autocomplete="off" autocapitalize="off" spellcheck="false" size="10" />
-    </label>
-    <button type="button" id="jd-options-btn" class="btn" aria-expanded="false" aria-controls="jd-options"><span>Options</span></button>
-    <button type="button" id="jd-compare" class="btn btn-primary" title="Compare now (Ctrl or Cmd + Enter)">Compare <span class="kbd" aria-hidden="true">Ctrl Enter</span></button>
-  </div>
-
-  <div id="jd-options" class="jd-options" hidden>
-    <fieldset class="jd-set jd-set-wide">
-      <legend>Ignore paths</legend>
-      <label for="jd-ignore" class="sr-only">Paths to ignore, one per line</label>
-      <textarea id="jd-ignore" class="ctl mono" rows="4" placeholder="**.updatedAt&#10;items[*].id&#10;$.meta.requestId" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
-      <p class="hint">One pattern per line. <code>**.name</code> matches at any depth, <code>[*]</code> matches any array item. Lines that start with <code>#</code> are notes.</p>
-      <div id="jd-ignore-err" class="jd-field-err" role="alert" hidden></div>
-    </fieldset>
-    <fieldset class="jd-set">
-      <legend>Numbers</legend>
-      <label class="jd-check"><input type="radio" name="jd-nummode" value="value" checked /> By value (1.0 equals 1)</label>
-      <label class="jd-check"><input type="radio" name="jd-nummode" value="written" /> As written (1.0 differs from 1)</label>
-      <div class="jd-tol">
-        <label for="jd-abs">Allow a difference of</label>
-        <input id="jd-abs" class="ctl" type="text" inputmode="decimal" placeholder="0" autocomplete="off" size="6" />
-        <label for="jd-rel">or</label>
-        <input id="jd-rel" class="ctl" type="text" inputmode="decimal" placeholder="0" autocomplete="off" size="6" /><span>%</span>
-      </div>
-      <div id="jd-tol-err" class="jd-field-err" role="alert" hidden></div>
-    </fieldset>
-    <fieldset class="jd-set">
-      <legend>Text values</legend>
-      <label class="jd-check"><input type="checkbox" id="jd-s-case" /> Ignore case</label>
-      <label class="jd-check"><input type="checkbox" id="jd-s-trim" /> Trim the ends</label>
-      <label class="jd-check"><input type="checkbox" id="jd-s-collapse" /> Collapse inner spaces</label>
-      <label class="jd-check"><input type="checkbox" id="jd-s-nfc" /> Normalize Unicode (NFC)</label>
-    </fieldset>
-    <fieldset class="jd-set">
-      <legend>Reading</legend>
-      <label class="jd-check"><input type="checkbox" id="jd-tolerant" /> Allow comments and trailing commas (not strict JSON)</label>
-      <button type="button" id="jd-reset-opts" class="btn-sm">Reset all options</button>
-    </fieldset>
-  </div>
-
-  <ul id="jd-chips" class="jd-chips" aria-label="Options that are on" hidden></ul>
-
-  <div class="jd-panes">
-    {panes.map((p) => (
-      <div class="jd-pane" id={`jd-pane-${p.side}`}>
-        <div class="jd-pane-head">
-          <p class="jd-pane-title" id={`jd-title-${p.side}`}>{p.title}</p>
-          <span class="jd-status" id={`jd-st-${p.side}`} data-state="empty">Empty</span>
-          <span class="jd-lines" id={`jd-lines-${p.side}`}></span>
-          <div class="jd-pane-acts">
-            <button type="button" class="btn-sm" data-act="open" title="Open a JSON file" aria-label={`Open a file for ${p.title}`}>Open</button>
-            <button type="button" class="btn-sm" data-act="format">Format</button>
-            <button type="button" class="btn-sm" data-act="copy">Copy</button>
-            <button type="button" class="btn-sm" data-act="clear">Clear</button>
-            <button type="button" class="btn-sm" data-act="collapse" aria-expanded="true" aria-controls={`jd-body-${p.side}`}>Hide</button>
-          </div>
-          <input type="file" class="sr-only" tabindex="-1" aria-label={`Open a JSON file for ${p.title}`} accept=".json,.jsonl,.txt,application/json,text/plain" />
+<div id="tool" class="np" data-font={url('fonts/masthead.woff2')}>
+  <div class="np-grid">
+    <div class="np-stage">
+      <p class="np-hint" id="np-hint">Tap any text on the page to change it.</p>
+      <div class="np-wrap" id="np-wrap">
+        <canvas id="np-canvas" role="img" aria-label="Preview of your newspaper front page"></canvas>
+        <div id="np-hits" class="np-hits"></div>
+        <div id="np-editor-box" class="np-editor" hidden>
+          <label for="np-editor" id="np-editor-label" class="np-editor-label">Headline</label>
+          <textarea id="np-editor" rows="2" spellcheck="true"></textarea>
+          <button type="button" class="btn-sm" id="np-editor-done">Done</button>
         </div>
-        <div class="jd-body" id={`jd-body-${p.side}`}>
-          <div class="jd-big" id={`jd-big-${p.side}`} hidden>
-            <span id={`jd-bigtext-${p.side}`}></span>
-            <button type="button" class="btn-sm" data-big="format">Format</button>
-            <button type="button" class="btn-sm" data-big="edit">Edit as text</button>
-            <button type="button" class="btn-sm" data-big="clear">Clear</button>
-          </div>
-          <div class="jd-editor">
-            <pre class="jd-gutter" id={`jd-gut-${p.side}`} aria-hidden="true">1</pre>
-            <div class="jd-errline" id={`jd-errline-${p.side}`} hidden aria-hidden="true"></div>
-            <textarea id={`jd-in-${p.side}`} class="jd-ta" aria-labelledby={`jd-title-${p.side}`} wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" placeholder="Paste JSON here, or drop a file"></textarea>
-          </div>
-          <div class="jd-error" id={`jd-err-${p.side}`} role="alert" hidden></div>
-        </div>
+        <div id="np-drop" class="np-drop" hidden><span>Drop the photo to add it</span></div>
       </div>
-    ))}
-  </div>
-
-  <section class="jd-result" id="jd-result" aria-labelledby="jd-result-h">
-    <h2 id="jd-result-h" class="sr-only">Result</h2>
-    <div id="jd-live" class="sr-only" role="status" aria-live="polite"></div>
-    <div id="jd-progress" class="jd-progress" hidden>
-      <progress id="jd-progbar" max="1"></progress>
-      <span id="jd-progtext">Working</span>
-      <button type="button" id="jd-cancel" class="btn-sm">Cancel</button>
+      <div class="np-actions" id="np-actions">
+        <button type="button" class="btn btn-primary" id="np-png">Download PNG</button>
+        <button type="button" class="btn" id="np-pdf">Download PDF</button>
+        <button type="button" class="btn" id="np-print">Print</button>
+        <button type="button" class="btn" id="np-share" hidden>Share</button>
+      </div>
+      <p class="np-status" id="np-status" role="status" aria-live="polite"></p>
+      <p class="np-private"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 1 2.5 3v4.2c0 3.4 2.3 6.4 5.5 7.8 3.2-1.4 5.5-4.4 5.5-7.8V3L8 1Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="m5.5 8 1.8 1.8L10.8 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Your photo stays on this device. Nothing is uploaded.</p>
     </div>
-    <div id="jd-empty" class="jd-empty">
-      <ol class="jd-steps">
-        <li><strong>Paste</strong> the first JSON on the left.</li>
-        <li><strong>Paste</strong> the second JSON on the right.</li>
-        <li><strong>Read</strong> the list of changes, with a path for each one.</li>
-      </ol>
-      <p><button type="button" class="btn" data-act="sample-empty">Load a sample</button></p>
-    </div>
-    <p id="jd-msg" class="jd-msg" hidden></p>
-    <div id="jd-res" hidden>
-      <div class="jd-summary">
-        <p id="jd-sum-text" class="jd-sum-text"></p>
-        <div id="jd-filters" class="jd-filters" role="group" aria-label="Show only"></div>
-        <div class="jd-sum-acts">
-          <button type="button" id="jd-copy-report" class="btn-sm">Copy report</button>
-          <button type="button" id="jd-download" class="btn-sm">Download .txt</button>
-          <button type="button" id="jd-copy-patch" class="btn-sm" title="JSON Patch (RFC 6902)">Copy JSON Patch</button>
-          <button type="button" id="jd-share" class="btn-sm" title="A link that holds both documents. It contains your data." hidden>Copy share link</button>
-        </div>
-      </div>
-      <div id="jd-info" class="jd-info"></div>
-      <div class="jd-tabs-wrap">
-        <div class="jd-tabs" role="tablist" aria-label="Result view">
-          <button type="button" role="tab" id="jd-tab-list" aria-selected="true" aria-controls="jd-panel-list">Changes</button>
-          <button type="button" role="tab" id="jd-tab-sbs" aria-selected="false" aria-controls="jd-panel-sbs" tabindex="-1">Side by side</button>
-        </div>
-      </div>
-      <div role="tabpanel" id="jd-panel-list" aria-labelledby="jd-tab-list">
-        <label class="jd-find"><span class="sr-only">Filter changes by path or value</span><input id="jd-find" class="ctl" type="search" placeholder="Filter by path or value" autocomplete="off" spellcheck="false" /></label>
-        <ol id="jd-list" class="jd-list"></ol>
-        <p id="jd-list-note" class="hint" hidden></p>
-        <button type="button" id="jd-more" class="btn" hidden>Show more</button>
-      </div>
-      <div role="tabpanel" id="jd-panel-sbs" aria-labelledby="jd-tab-sbs" hidden>
-        <div class="jd-sbs-bar">
-          <button type="button" id="jd-prev" class="btn-sm" aria-keyshortcuts="p">Previous change</button>
-          <button type="button" id="jd-next" class="btn-sm" aria-keyshortcuts="n">Next change</button>
-          <label class="jd-check"><input type="checkbox" id="jd-sortkeys" /> Sort keys</label>
-          <span id="jd-cur" class="jd-cur" aria-live="polite"></span>
-        </div>
-        <div class="jd-sbs-switch" role="group" aria-label="Show one document">
-          <button type="button" class="btn-sm" data-sbs="a" aria-pressed="true">Before</button>
-          <button type="button" class="btn-sm" data-sbs="b" aria-pressed="false">After</button>
-        </div>
-        <p id="jd-sbs-note" class="hint"></p>
-        <p id="jd-moved-note" class="hint" hidden><span aria-hidden="true">⇅</span> marks an item that moved. Matched items sit on the same row, so you can read across.</p>
-        <div class="jd-sbs" id="jd-sbs">
-          <div class="jd-sbs-col" data-col="a">
-            <p class="jd-sbs-title">Original</p>
-            <div class="jd-sv" id="jd-sv-a" tabindex="0" role="region" aria-label="Original, formatted"><div class="jd-sz" id="jd-sz-a"><div class="jd-sw" id="jd-sw-a"></div></div></div>
-          </div>
-          <div class="jd-sbs-col" data-col="b" data-hide="true">
-            <p class="jd-sbs-title">Changed</p>
-            <div class="jd-sv" id="jd-sv-b" tabindex="0" role="region" aria-label="Changed, formatted"><div class="jd-sz" id="jd-sz-b"><div class="jd-sw" id="jd-sw-b"></div></div></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
 
-  <div id="jd-toast" class="jd-toast" role="status" hidden></div>
-  <div id="jd-phonebar" class="jd-phonebar" role="group" aria-label="Switch view">
-    <button type="button" data-go="edit">Edit</button>
-    <button type="button" data-go="result">Result</button>
-    <button type="button" id="jd-compare-bar" class="go">Compare</button>
+    <div class="np-panel">
+      <fieldset class="np-sec">
+        <legend>1. Occasion</legend>
+        <div class="np-chips" role="radiogroup" aria-label="Occasion">
+          {PRESET_IDS.map((id) => (
+            <label class="np-chip"><input type="radio" name="np-occasion" value={id} /><span>{PRESETS[id].label}</span></label>
+          ))}
+        </div>
+        <div class="np-row">
+          <label class="np-field"><span>Name</span><input class="ctl" id="np-name" type="text" autocomplete="off" maxlength="60" /></label>
+          <label class="np-field np-num" id="np-num-wrap"><span id="np-num-label">Age</span><input class="ctl" id="np-num" type="text" inputmode="numeric" autocomplete="off" maxlength="8" /></label>
+        </div>
+        <div class="np-row">
+          <label class="np-field"><span>Date on the page</span><input class="ctl" id="np-date" type="date" /></label>
+          <button type="button" class="btn np-surprise" id="np-surprise">Surprise me</button>
+        </div>
+      </fieldset>
+
+      <fieldset class="np-sec">
+        <legend>2. Look</legend>
+        <div class="np-templates" role="radiogroup" aria-label="Layout">
+          {Object.values(TEMPLATES).map((t) => (
+            <label class="np-tpl">
+              <input type="radio" name="np-template" value={t.id} />
+              <span class="np-tpl-card">
+                {t.id === 'classic' && (
+                  <svg viewBox="0 0 60 78" aria-hidden="true"><rect x=".5" y=".5" width="59" height="77" rx="2" class="pg"/><rect x="8" y="5" width="44" height="6" class="ink"/><rect x="4" y="13" width="52" height="1" class="ink"/><rect x="4" y="17" width="52" height="5" class="ink"/><rect x="4" y="25" width="34" height="18" class="ph"/><rect x="4" y="46" width="16" height="26" class="tx"/><rect x="22" y="46" width="16" height="26" class="tx"/><rect x="41" y="25" width="15" height="4" class="ink"/><rect x="41" y="31" width="15" height="41" class="tx"/></svg>
+                )}
+                {t.id === 'tabloid' && (
+                  <svg viewBox="0 0 60 78" aria-hidden="true"><rect x=".5" y=".5" width="59" height="77" rx="2" class="pg"/><rect x="4" y="4" width="52" height="11" class="ink"/><circle cx="49" cy="9.5" r="4.5" class="yel"/><rect x="4" y="18" width="52" height="22" class="ph"/><rect x="6" y="20" width="12" height="3.5" class="red"/><rect x="4" y="43" width="52" height="9" class="ink"/><rect x="4" y="55" width="16" height="17" class="tx"/><rect x="22" y="55" width="16" height="17" class="tx"/><rect x="41" y="55" width="15" height="17" class="box"/></svg>
+                )}
+                {t.id === 'vintage' && (
+                  <svg viewBox="0 0 60 78" aria-hidden="true"><rect x=".5" y=".5" width="59" height="77" rx="2" class="pg sep"/><rect x="3" y="3" width="54" height="72" class="frame"/><rect x="10" y="7" width="40" height="6" class="ink"/><rect x="6" y="16" width="48" height="1.5" class="ink"/><rect x="9" y="20" width="42" height="5" class="ink"/><rect x="6" y="28" width="23" height="15" class="ph"/><rect x="6" y="45" width="11" height="26" class="tx"/><rect x="18" y="45" width="11" height="26" class="tx"/><rect x="31" y="28" width="11" height="43" class="tx"/><rect x="43" y="28" width="11" height="43" class="tx"/></svg>
+                )}
+                <span>{t.name}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        <div class="np-row">
+          <label class="np-field"><span>Name style</span>
+            <select class="ctl" id="np-face"><option value="auto">Match the layout</option><option value="old">Old English</option><option value="serif">Bold serif</option><option value="sans">Bold sans</option></select>
+          </label>
+          <label class="np-field"><span>Paper</span>
+            <select class="ctl" id="np-paper"><option value="tint">Newsprint tint</option><option value="white">White (saves ink)</option></select>
+          </label>
+        </div>
+        <div class="np-row">
+          <label class="np-field"><span>Photo look</span>
+            <select class="ctl" id="np-look"><option value="auto">Match the layout</option><option value="color">Color</option><option value="bw">Black and white</option><option value="halftone">Halftone dots</option></select>
+          </label>
+          <label class="np-check"><input type="checkbox" id="np-notice" /><span>Show the "Novelty print" label</span></label>
+        </div>
+      </fieldset>
+
+      <fieldset class="np-sec" id="np-photos">
+        <legend>3. Photos</legend>
+        {[['main', 'Main photo'], ['side', 'Second photo (second story)']].map(([slot, label]) => (
+          <div class="np-photo" data-slot={slot}>
+            <div class="np-photo-head">
+              <span class="np-photo-title">{label}</span>
+              <span class="np-photo-name" data-role="name"></span>
+            </div>
+            <div class="np-photo-btns">
+              <label class="btn np-file"><input type="file" accept="image/*" data-role="file" class="sr-only" /><span data-role="add">Add photo</span></label>
+              <button type="button" class="btn" data-role="remove" hidden>Remove</button>
+            </div>
+            <label class="np-zoom" data-role="zoom-wrap" hidden><span>Zoom</span><input type="range" min="1" max="3" step="0.05" value="1" data-role="zoom" /></label>
+            <p class="np-note" data-role="note"></p>
+          </div>
+        ))}
+        <p class="np-note">Drag the photo on the page to move it. You can also drop a photo on the page.</p>
+      </fieldset>
+
+      <fieldset class="np-sec">
+        <legend>4. Size</legend>
+        <div class="np-sizes" role="radiogroup" aria-label="Size">
+          {FORMAT_IDS.map((id) => (
+            <label class="np-size"><input type="radio" name="np-format" value={id} /><span>{FORMATS[id].name}</span></label>
+          ))}
+        </div>
+      </fieldset>
+
+      <details class="np-sec np-all" id="np-all">
+        <summary>All text on the page</summary>
+        <div class="np-fields">
+          {FIELDS.map((f) => (
+            <div class="np-f">
+              <label for={`np-f-${f.id}`}>{f.label}</label>
+              {f.line
+                ? <input class="ctl" type="text" id={`np-f-${f.id}`} data-field={f.id} autocomplete="off" />
+                : <textarea class="ctl" id={`np-f-${f.id}`} data-field={f.id} rows={f.id === 'body' ? 6 : f.id === 'sideBody' ? 4 : 2}></textarea>}
+              <span class="np-f-note" data-note={f.id}></span>
+            </div>
+          ))}
+        </div>
+      </details>
+
+      <div class="np-reset"><button type="button" class="link" id="np-reset">Start over</button><span class="np-note">Your text is saved on this device. Photos are never saved.</span></div>
+    </div>
   </div>
-</section>
-
+  <div id="np-print-area" class="np-print-area" aria-hidden="true"></div>
+</div>
+<style is:inline id="np-page-style"></style>
 <script>
-  import { initTool } from '../lib/jd/ui.js';
-  initTool();
+  import { start } from '../lib/np/ui.js';
+  start();
 </script>

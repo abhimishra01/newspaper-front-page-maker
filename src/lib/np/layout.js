@@ -4,7 +4,7 @@
 //   hits:   [{ field | photo, x, y, w, h }] tap targets for inline editing
 //   hidden: { field: reason } for fields this page cannot show
 import { DESIGN_W, designHeight, FORMATS } from './formats.js';
-import { wrap, fitText, flow, ellipsize } from './text.js';
+import { wrap, fitText, flow, ellipsize, balance } from './text.js';
 
 export const TEMPLATES = {
   classic: { id: 'classic', name: 'Classic broadsheet', face: 'serif', look: 'bw' },
@@ -141,7 +141,7 @@ function ear(P, field, text, x, y, w, maxH, ink, double = false) {
 }
 
 // Shared top for classic and vintage: ears, name, motto, notice. Returns the new y.
-function nameRow(P, d, o, tpl, m, ink, double) {
+function nameRow(P, d, o, tpl, m, ink, double, top = m) {
   const { W } = P;
   const showEars = has(d.earLeft) || has(d.earRight);
   const earW = showEars ? 150 : 0;
@@ -157,7 +157,7 @@ function nameRow(P, d, o, tpl, m, ink, double) {
     earH = Math.max(has(d.earLeft) ? ear(probe, 'x', d.earLeft, 0, 0, earW, 120, ink) : 0, has(d.earRight) ? ear(probe, 'x', d.earRight, 0, 0, earW, 120, ink) : 0);
   }
   const rowH = Math.max(mastH, earH, 40);
-  const y = m;
+  const y = top;
   if (has(d.earLeft)) ear(P, 'earLeft', d.earLeft, m, y + (rowH - earH) / 2, earW, 120, ink, double);
   if (has(d.earRight)) ear(P, 'earRight', d.earRight, W - m - earW, y + (rowH - earH) / 2, earW, 120, ink, double);
   if (mastH) P.lines('paper', mr.lines, mx, y + (rowH - mastH) / 2, mw, mr.size, 1.08, mf(mr.size), ink, 'center');
@@ -201,8 +201,10 @@ function solveStory(P, { x, y, w, h, cols, gutter, photo, look, d, ink, bodySize
     // Spare room: let the photo grow, then the body text.
     const cap = photo ? Math.min(h * 0.62, (photoMax ?? Infinity) * 1.25, w * 1.1) : 0;
     while (photo && best.ph + 12 <= cap) { const n = tryLayout(best.ph + 12, best.size); if (n.cut) break; best = n; }
-    while (best.size + 0.5 <= bodySize * 1.3) { const n = tryLayout(best.ph, best.size + 0.5); if (n.cut) break; best = n; }
+    const sizeCap = bodySize * 1.5;
+    while (best.size + 0.5 <= sizeCap) { const n = tryLayout(best.ph, best.size + 0.5); if (n.cut) break; best = n; }
   }
+  best.colsR = balance(d.body, best.colsR, bodyFont(best.size), best.size, 1.32, P.measure);
   let yy = y;
   if (photo) {
     P.photo('main', x, yy, w, best.ph, look);
@@ -221,12 +223,19 @@ function sideStory(P, { x, y, w, h, d, photo, look, ink, bodySize, headFont, hea
   let yy = y;
   if (has(d.sideHead)) yy += P.fit('sideHead', d.sideHead, x, yy, w, Math.min(170, h * 0.3), headFont, 20, headMax, 1.08, ink, 'left', { upper, maxLines: 5 }) + 8;
   if (photo) {
-    const ph = clamp(w * 0.8, 80, h * 0.4);
+    const reserve = has(d.sideBody) ? bodySize * 1.32 * 5 + 6 : 0;
+    const ph = Math.max(60, Math.min(w * 0.8, h * 0.4, y + h - yy - reserve - 30));
     P.photo('side', x, yy, w, ph, look);
     yy += ph + 6;
     if (has(d.sideCaption)) yy += P.block('sideCaption', d.sideCaption, x, yy, w, 32, font(FONTS.serif, 400, 'italic'), 12, 15 / 12, ink) + 6;
   }
-  if (has(d.sideBody) && y + h - yy > bodySize * 1.32) P.flowText('sideBody', d.sideBody, [{ x, y: yy, w, h: y + h - yy }], font(FONTS.serif, 400), bodySize, 1.32, ink);
+  if (has(d.sideBody) && y + h - yy > bodySize * 1.32) {
+    const bf = font(FONTS.serif, 400);
+    const col = [{ x, y: yy, w, h: y + h - yy }];
+    let size = bodySize;
+    while (size + 0.5 <= bodySize * 1.35 && !flow(d.sideBody, col, bf(size + 0.5), size + 0.5, 1.32, P.measure).cut) size += 0.5;
+    P.flowText('sideBody', d.sideBody, col, bf, size, 1.32, ink);
+  }
 }
 
 function classic(P, d, o, photos) {
@@ -358,7 +367,7 @@ function tabloid(P, d, o, photos) {
   };
   const headH = clamp(H * 0.17, 150, 300);
   if (photos.main) {
-    const ph = clamp((bottom - y) * 0.4, 140, 640);
+    const ph = clamp((bottom - y) * (roomy && (has(d.sideHead) || has(d.sideBody)) ? 0.33 : 0.4), 140, 640);
     P.photo('main', m, y, W - 2 * m, ph, o.look);
     tag(m + 14, y + 14);
     y += ph + 6;
@@ -401,7 +410,7 @@ function vintage(P, d, o, photos) {
   const half = (W - 2 * m) / 2;
   P.one('volume', d.volume, m, m - 4, half - 10, font(FONTS.serif, 700), 13, ink, 'left', true);
   P.one('price', d.price, m + half + 10, m - 4, half - 10, font(FONTS.serif, 700), 13, ink, 'right', true);
-  let y = nameRow(P, d, o, 'vintage', m, ink, true);
+  let y = nameRow(P, d, o, 'vintage', m, ink, true, m + 20);
   // Ornamental rules with a diamond, then the date.
   const ornament = (yy) => {
     P.line(m, yy, W - m, yy, ink, 3); P.line(m, yy + 6, W - m, yy + 6, ink, 0.8);
@@ -454,8 +463,10 @@ function vintage(P, d, o, photos) {
   while (best.cut && best.ph > minPh) best = tryLayout(Math.max(minPh, best.ph - 12), bodySize);
   if (!best.cut) {
     while (photos.main && best.ph + 12 <= Math.min((bottom - y) * 0.6, pw * 1.2)) { const n = tryLayout(best.ph + 12, best.size); if (n.cut) break; best = n; }
-    while (best.size + 0.5 <= bodySize * 1.3) { const n = tryLayout(best.ph, best.size + 0.5); if (n.cut) break; best = n; }
+    const sizeCap = bodySize * 1.5;
+    while (best.size + 0.5 <= sizeCap) { const n = tryLayout(best.ph, best.size + 0.5); if (n.cut) break; best = n; }
   }
+  best.cols = balance(d.body, best.cols, bodyFont(best.size), best.size, 1.3, P.measure);
   let yy = y;
   if (photos.main) {
     P.photo('main', m, yy, pw, best.ph, o.look);

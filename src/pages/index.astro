@@ -6,7 +6,6 @@ import AdSlot from '../components/AdSlot.astro';
 import Faq from '../components/Faq.astro';
 import site from '../site.config.ts';
 import { faq } from '../data/faq.ts';
-import { url } from '../lib/url.ts';
 
 const base = site.origin;
 const jsonLd = [
@@ -45,19 +44,11 @@ const jsonLd = [
   },
 ];
 ---
-<Base jsonLd={jsonLd} fullTitle="JSON Diff Checker: Compare JSON Online (Free, Private)">
-  <section class="mx-auto max-w-5xl px-4 pt-4 sm:pt-8">
-    <h1 class="text-xl font-extrabold leading-tight tracking-tight [text-wrap:balance] sm:text-3xl">JSON Diff Checker: Compare Two JSON Files</h1>
-    <p class="mt-1 max-w-3xl text-sm text-muted sm:text-base">See every change by path. Your data stays in your browser.</p>
+<Base jsonLd={jsonLd} fullTitle="Newspaper Generator With Photo: Front Page Maker">
+  <section class="mx-auto max-w-6xl px-4 pt-4 sm:pt-8">
+    <h1 class="text-xl font-extrabold leading-tight tracking-tight [text-wrap:balance] sm:text-3xl">Newspaper Front Page Maker With Your Photo</h1>
+    <p class="mt-1 max-w-3xl text-sm text-muted sm:text-base">Pick a look, add a photo, change every word. Print it on Letter or A4, or post it. Free, with no watermark.</p>
     <div class="mt-4 sm:mt-5"><Tool /></div>
-    <nav class="jd-try" aria-label="Examples">
-      <span>Try an example:</span>
-      <button type="button" class="btn-sm" data-scenario="ignore-array-order">Ignore array order</button>
-      <button type="button" class="btn-sm" data-scenario="ignore-fields">Ignore fields</button>
-      <button type="button" class="btn-sm" data-scenario="compare-by-id">Compare by id</button>
-      <button type="button" class="btn-sm" data-scenario="exact-numbers">Exact numbers</button>
-      <button type="button" class="btn-sm" data-scenario="large-files">Large files</button>
-    </nav>
     <AdSlot />
   </section>
   <Article />
