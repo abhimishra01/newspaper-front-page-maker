@@ -117,6 +117,7 @@ function openEditor(field) {
   ed.value = S.fields[field];
   ed.rows = LINE.has(field) ? 1 : field === 'body' || field === 'sideBody' ? 6 : 3;
   $('np-editor-box').hidden = false;
+  bar();
   placeEditor();
   ed.focus();
   ed.setSelectionRange(ed.value.length, ed.value.length);
@@ -145,6 +146,7 @@ function closeEditor(refocus) {
   const f = editing;
   editing = null;
   $('np-editor-box').hidden = true;
+  bar();
   if (refocus) {
     const b = [...$('np-hits').children].find((x) => x.dataset.id === f);
     (b || $('np-canvas')).focus?.();
@@ -163,7 +165,7 @@ function setField(field, value, from) {
 function notes() {
   for (const f of FIELD_IDS) {
     const el = document.querySelector(`[data-note="${f}"]`);
-    const msg = L.hidden[f] || '';
+    const msg = L.hidden[f] || (L.cut[f] ? 'Cut short to fit this size. Shorten it or pick a bigger size.' : '');
     if (el && el.textContent !== msg) el.textContent = msg;
   }
   const sideShown = !L.hidden.sideHead && !L.hidden.sideBody;
@@ -195,9 +197,58 @@ function formatButtons() {
   $('np-pdf').hidden = !print;
   $('np-print').hidden = !print;
   $('np-png').textContent = `Download PNG (${FORMATS[S.format].short})`;
+  $('np-bar-png').textContent = `Download PNG (${FORMATS[S.format].short})`;
 }
 
-function status(msg) { $('np-status').textContent = msg; }
+function status(msg) { $('np-status').textContent = msg; $('np-bar-msg').textContent = msg; }
+
+// Text parts on the page in reading order, for Back and Next in the editor.
+function fieldOrder() { return L.hits.filter((h) => h.field).map((h) => h.field); }
+function step(dir) {
+  const order = fieldOrder();
+  if (!order.length) return;
+  const i = order.indexOf(editing);
+  openEditor(order[(i + dir + order.length) % order.length]);
+}
+
+// A tap that lands between text parts (some lines are only a few pixels tall on a phone)
+// opens the nearest one, if it is close enough.
+function nearestField(clientX, clientY) {
+  const r = $('np-hits').getBoundingClientRect();
+  const x = (clientX - r.left) / k, y = (clientY - r.top) / k;
+  let best = null, bestD = Infinity;
+  for (const h of L.hits) {
+    if (!h.field) continue;
+    const dx = Math.max(h.x - x, 0, x - (h.x + h.w)), dy = Math.max(h.y - y, 0, y - (h.y + h.h));
+    const d = Math.hypot(dx, dy) * k;
+    if (d < bestD) { bestD = d; best = h.field; }
+  }
+  return bestD <= 18 ? best : null;
+}
+
+// ---------- phone bar ----------
+// Under 960 px the controls sit below the page. While the page and its buttons are out of view,
+// a bar at the bottom offers "See the page" and "Download PNG".
+let stageSeen = true, toolSeen = true;
+function bar() {
+  const el = $('np-bar');
+  // Hidden while typing, so it never sits on top of the phone keyboard.
+  const typing = document.activeElement?.matches?.('input[type="text"], textarea, input:not([type])');
+  const show = !stageSeen && toolSeen && !editing && !typing && matchMedia('(max-width: 959px)').matches;
+  if (el.hidden === show) el.hidden = !show;
+}
+function wireBar() {
+  if (!('IntersectionObserver' in window)) return;
+  new IntersectionObserver((es) => { stageSeen = es[0].isIntersecting; bar(); }).observe($('np-wrap'));
+  new IntersectionObserver((es) => { toolSeen = es[0].isIntersecting; bar(); }).observe($('tool'));
+  addEventListener('resize', bar);
+  document.addEventListener('focusin', bar);
+  document.addEventListener('focusout', () => setTimeout(bar, 0));
+  $('np-bar-see').addEventListener('click', () => {
+    $('np-wrap').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  });
+  $('np-bar-png').addEventListener('click', () => $('np-png').click());
+}
 
 function edited() { return FIELD_IDS.some((f) => f !== 'date' && S.fields[f] !== S.gen[f]); }
 
@@ -433,8 +484,9 @@ function wire() {
   // Tap targets on the page.
   $('np-hits').addEventListener('click', (e) => {
     const b = e.target.closest('.np-hit');
-    if (!b || b.classList.contains('np-hit-photo')) return;
-    openEditor(b.dataset.id);
+    if (b && b.classList.contains('np-hit-photo')) return;
+    const f = b ? b.dataset.id : nearestField(e.clientX, e.clientY);
+    if (f) openEditor(f);
   });
   const ed = $('np-editor');
   ed.addEventListener('input', () => setField(editing, ed.value, 'editor'));
@@ -443,6 +495,8 @@ function wire() {
     else if (e.key === 'Enter' && (LINE.has(editing) || e.metaKey || e.ctrlKey)) { e.preventDefault(); closeEditor(true); }
   });
   $('np-editor-done').addEventListener('click', () => closeEditor(true));
+  $('np-editor-prev').addEventListener('click', () => step(-1));
+  $('np-editor-next').addEventListener('click', () => step(1));
   $('np-editor-box').addEventListener('focusout', (e) => {
     if (!$('np-editor-box').contains(e.relatedTarget)) setTimeout(() => { if (!$('np-editor-box').contains(document.activeElement)) closeEditor(false); }, 0);
   });
@@ -506,6 +560,7 @@ function wire() {
   wirePhotoDrag();
   wireDrop();
   wireExport();
+  wireBar();
   new ResizeObserver(() => render()).observe($('np-wrap'));
 }
 

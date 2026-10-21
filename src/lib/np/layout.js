@@ -3,6 +3,7 @@
 //   ops:    drawing steps for draw.js
 //   hits:   [{ field | photo, x, y, w, h }] tap targets for inline editing
 //   hidden: { field: reason } for fields this page cannot show
+//   cut:    { field: true } for fields shown but cut short to fit
 import { DESIGN_W, designHeight, FORMATS } from './formats.js';
 import { wrap, fitText, flow, ellipsize, balance } from './text.js';
 
@@ -28,6 +29,8 @@ const PAPER = {
   vintage: { tint: '#ece0c3', white: '#ffffff', ink: '#2a2016', soft: '#544433' },
 };
 const RED = '#c8102e';
+const MORE = '(continued on page 2)';
+const BACKDROP = '#23272e';
 const YELLOW = '#ffd21f';
 
 /** Masthead face to use: the user's choice, or the template's own. */
@@ -39,7 +42,7 @@ export function mastFace(template, face) {
 class Page {
   constructor(W, H, measure) {
     this.W = W; this.H = H; this.measure = measure;
-    this.ops = []; this.hits = []; this.hidden = {};
+    this.ops = []; this.hits = []; this.hidden = {}; this.cut = {};
   }
   rect(x, y, w, h, fill, stroke, lw = 1) { this.ops.push({ t: 'rect', x, y, w, h, fill, stroke, lw }); }
   line(x1, y1, x2, y2, color, lw = 1) { this.ops.push({ t: 'line', x1, y1, x2, y2, color, lw }); }
@@ -69,6 +72,7 @@ class Page {
     if (ls.length > room) {
       ls = ls.slice(0, room);
       if (ls.length) ls[ls.length - 1] = { text: ellipsize(ls[ls.length - 1].text, w, fs, this.measure), end: true };
+      if (field) this.cut[field] = true;
     }
     return this.lines(field, ls, x, y, w, size, lh, fs, color, align, !!opt.justify);
   }
@@ -77,6 +81,7 @@ class Page {
   fit(field, text, x, y, w, h, fontFn, minSize, maxSize, lh, color, align = 'left', opt = {}) {
     const src = opt.upper ? String(text).toUpperCase() : text;
     const r = fitText(src, { font: fontFn, minSize, maxSize, w, h, lh, maxLines: opt.maxLines ?? 99 }, this.measure);
+    if (r.cut && field) this.cut[field] = true;
     return this.lines(field, r.lines, x, y, w, r.size, lh, fontFn(r.size), color, align);
   }
 
@@ -86,14 +91,15 @@ class Page {
     const fs = fontFn(size);
     let t = String(text).replace(/\s+/g, ' ').trim();
     if (upper) t = t.toUpperCase();
-    if (this.measure(t, fs) > w) t = ellipsize(t, w, fs, this.measure);
+    if (this.measure(t, fs) > w) { t = ellipsize(t, w, fs, this.measure); if (field) this.cut[field] = true; }
     return this.lines(field, [{ text: t, end: true }], x, y, w, size, 1.25, fs, color, align);
   }
 
   /** Flow a story through columns. Returns { cut, used } and adds one hit for the whole block. */
   flowText(field, text, cols, fontFn, size, lh, color) {
     const fs = fontFn(size);
-    const r = flow(text, cols, fs, size, lh, this.measure);
+    const r = flow(text, cols, fs, size, lh, this.measure, MORE);
+    if (r.cut) this.cut[field] = true;
     const step = size * lh;
     for (const p of r.placed) {
       const base = p.y + (step - size) / 2 + size * 0.8;
@@ -131,6 +137,7 @@ function ear(P, field, text, x, y, w, maxH, ink, double = false) {
   const room = Math.max(0, Math.floor((maxH - 2 * pad - labelLines.length * 15) / 17));
   const shown = bodyLines.slice(0, room);
   if (bodyLines.length > room && shown.length) shown[shown.length - 1] = { text: ellipsize(shown[shown.length - 1].text, w - 2 * pad, bf(14), P.measure), end: true };
+  if (bodyLines.length > room) P.cut[field] = true;
   const boxH = 2 * pad + labelLines.length * 15 + shown.length * 17;
   P.rect(x, y, w, boxH, null, ink, 1.2);
   if (double) P.rect(x + 3, y + 3, w - 6, boxH - 6, null, ink, 0.6);
@@ -149,6 +156,7 @@ function nameRow(P, d, o, tpl, m, ink, double, top = m) {
   const mx = m + earW + gap, mw = W - 2 * m - 2 * earW - 2 * gap;
   const mf = mastFace(tpl, o.face);
   const mr = fitText(d.paper, { font: mf, minSize: 30, maxSize: tpl === 'vintage' ? 118 : 104, w: mw, h: 130, lh: 1.0, maxLines: 1 }, P.measure);
+  if (mr.cut && has(d.paper)) P.cut.paper = true;
   const mastH = has(d.paper) ? mr.size * 1.08 : 0;
   // Ears are measured first so the row is tall enough for both.
   let earH = 0;
@@ -308,6 +316,7 @@ function tabloid(P, d, o, photos) {
   const mastBox = bandH - (noticeOn ? 34 : 20);
   if (has(d.paper)) {
     const r = fitText(d.paper, { font: mf, minSize: 30, maxSize: 120, w: mw, h: mastBox, lh: 1.0, maxLines: 1 }, P.measure);
+    if (r.cut) P.cut.paper = true;
     const mh = r.size * 1.0;
     P.lines('paper', r.lines, m + 24, m + (mastBox - mh) / 2 + 6, mw, r.size, 1.0, mf(r.size), '#ffffff', 'left');
   }
@@ -317,6 +326,7 @@ function tabloid(P, d, o, photos) {
     P.circle(cx, cy, flashR, YELLOW);
     const pw = flashR * 1.45;
     const r = fitText(d.price, { font: font(FONTS.sans, 800), minSize: 12, maxSize: 24, w: pw, h: flashR * 1.2, lh: 1.05, maxLines: 4 }, P.measure);
+    if (r.cut) P.cut.price = true;
     const th = r.lines.length * r.size * 1.05;
     P.lines('price', r.lines, cx - pw / 2, cy - th / 2, pw, r.size, 1.05, font(FONTS.sans, 800)(r.size), ink, 'center');
   }
@@ -403,7 +413,7 @@ function vintage(P, d, o, photos) {
   const V = PAPER.vintage;
   const ink = V.ink;
   P.rect(0, 0, W, H, o.paper === 'white' ? V.white : V.tint);
-  if (o.paper !== 'white') P.ops.push({ t: 'speckle', seed: 7, count: Math.round(W * H / 900), color: V.soft });
+  if (o.paper !== 'white') P.ops.push({ t: 'speckle', seed: 7, count: Math.round(W * H / 900), color: V.soft, x: 0, y: 0, w: W, h: H });
   P.rect(m - 16, m - 16, W - 2 * m + 32, H - 2 * m + 32, null, ink, 1.4);
   P.rect(m - 11, m - 11, W - 2 * m + 22, H - 2 * m + 22, null, ink, 0.5);
   // Top row: volume left, price right.
@@ -506,7 +516,9 @@ const RENDER = { classic, tabloid, vintage };
 export function layout(template, format, doc, photos, measure) {
   const W = DESIGN_W;
   const H = designHeight(format);
-  const P = new Page(W, H, measure);
+  // Story: keep the page clear of the app's own bars at the top and bottom of the screen.
+  const inset = ((FORMATS[format].safe || 0) * W) / FORMATS[format].w;
+  const P = new Page(W, H - 2 * inset, measure);
   const tpl = RENDER[template] ? template : 'classic';
   const opts = { face: 'auto', paper: 'tint', look: 'auto', notice: true, ...(doc.opts || {}) };
   const o = { ...opts, print: FORMATS[format].print, look: opts.look === 'auto' ? TEMPLATES[tpl].look : opts.look };
@@ -520,5 +532,11 @@ export function layout(template, format, doc, photos, measure) {
   if (!o.notice && has(d.notice)) P.hide('notice', 'Turned off under Look');
   // A field with text that got no tap target was squeezed out: tell the user.
   for (const f of Object.keys(d)) if (has(d[f]) && !P.hidden[f] && !P.hits.some((h) => h.field === f)) P.hide(f, 'No room at this size');
-  return { W, H, ops: P.ops, hits: P.hits, hidden: P.hidden };
+  if (inset) {
+    for (const op of P.ops) for (const k of ['y', 'y1', 'y2', 'cy']) if (k in op) op[k] += inset;
+    for (const h of P.hits) h.y += inset;
+    P.ops.unshift({ t: 'rect', x: 0, y: 0, w: W, h: H, fill: BACKDROP });
+  }
+  for (const f of Object.keys(P.cut)) if (P.hidden[f]) delete P.cut[f];
+  return { W, H, ops: P.ops, hits: P.hits, hidden: P.hidden, cut: P.cut };
 }

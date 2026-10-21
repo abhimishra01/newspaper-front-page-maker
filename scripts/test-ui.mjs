@@ -176,7 +176,30 @@ await step('phone: no sideways scroll, A4 for en-GB, tap targets work', async ()
   assert.equal(await p2.isVisible('#np-editor'), true);
   const fs16 = await p2.$eval('#np-editor', (e) => parseFloat(getComputedStyle(e).fontSize));
   assert.ok(fs16 >= 16, 'editor font at least 16px');
+  // Back and Next step through the text parts without hunting for tiny lines.
+  await p2.click('#np-editor-next');
+  assert.equal(await p2.textContent('#np-editor-label'), 'Line under the name');
+  await p2.click('#np-editor-prev');
+  assert.equal(await p2.textContent('#np-editor-label'), 'Newspaper name');
   await p2.click('#np-editor-done');
+  // A tap just beside a line that is only a few pixels tall opens the nearest text part.
+  const near = await p2.evaluate(() => {
+    const hits = document.getElementById('np-hits').getBoundingClientRect();
+    const v = document.querySelector('.np-hit[data-id="volume"]').getBoundingClientRect();
+    return { x: v.left - 6 - hits.left, y: v.top + v.height / 2 - hits.top, h: v.height };
+  });
+  assert.ok(near.h < 24, 'the volume line should be a small target at 390');
+  await p2.click('#np-hits', { position: { x: near.x, y: near.y } });
+  assert.equal(await p2.textContent('#np-editor-label'), 'Volume and number');
+  await p2.keyboard.press('Escape');
+  // The bottom bar shows once the page is scrolled away, and gets back to it.
+  assert.equal(await p2.isVisible('#np-bar'), false);
+  await p2.locator('#np-photos').scrollIntoViewIfNeeded();
+  await p2.waitForSelector('#np-bar', { state: 'visible' });
+  const [dl] = await Promise.all([p2.waitForEvent('download'), p2.click('#np-bar-png')]);
+  assert.ok(dl.suggestedFilename().endsWith('-a4.png'));
+  await p2.click('#np-bar-see');
+  await p2.waitForSelector('#np-bar', { state: 'hidden' });
   // A swipe over the photo scrolls the page; a tap turns on move mode, a second tap ends it.
   assert.equal(await p2.$eval('.np-hit[data-id="photo:main"]', (e) => getComputedStyle(e).touchAction), 'pan-y pinch-zoom');
   await p2.tap('.np-hit[data-id="photo:main"]');

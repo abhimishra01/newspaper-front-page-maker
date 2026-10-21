@@ -15,7 +15,11 @@ import { url } from '../lib/url.ts';
         <div id="np-editor-box" class="np-editor" hidden>
           <label for="np-editor" id="np-editor-label" class="np-editor-label">Headline</label>
           <textarea id="np-editor" rows="2" spellcheck="true"></textarea>
-          <button type="button" class="btn-sm" id="np-editor-done">Done</button>
+          <div class="np-editor-btns">
+            <button type="button" class="btn-sm" id="np-editor-prev" aria-label="Back to the previous text on the page">‹ Back</button>
+            <button type="button" class="btn-sm" id="np-editor-next" aria-label="Next text on the page">Next ›</button>
+            <button type="button" class="btn-sm np-editor-done" id="np-editor-done">Done</button>
+          </div>
         </div>
         <div id="np-drop" class="np-drop" hidden><span>Drop the photo to add it</span></div>
       </div>
@@ -128,6 +132,13 @@ import { url } from '../lib/url.ts';
       </details>
 
       <div class="np-reset"><button type="button" class="link" id="np-reset">Start over</button><span class="np-note">Your text is saved on this device. Photos are never saved.</span></div>
+    </div>
+  </div>
+  <div id="np-bar" class="np-bar" hidden>
+    <p class="np-bar-msg" id="np-bar-msg" aria-hidden="true"></p>
+    <div class="np-bar-btns">
+      <button type="button" class="btn" id="np-bar-see">See the page</button>
+      <button type="button" class="btn btn-primary" id="np-bar-png">Download PNG</button>
     </div>
   </div>
   <div id="np-print-area" class="np-print-area" aria-hidden="true"></div>

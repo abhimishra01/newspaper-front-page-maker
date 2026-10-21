@@ -72,9 +72,10 @@ export function fitText(text, { font, minSize, maxSize, w, h, lh = 1.1, maxLines
 /**
  * Flow text through columns ({x, y, w, h}); columns may have different widths.
  * Lines are size*lh apart. Returns { placed: [{ col, x, y, w, text, end }], cut, usedH }.
- * When the text does not fit, the last line ends with an ellipsis.
+ * When the text does not fit, the last line ends with an ellipsis, then `more` (such as
+ * "(continued on page 2)") when it fits on that line.
  */
-export function flow(text, cols, fontStr, size, lh, measure) {
+export function flow(text, cols, fontStr, size, lh, measure, more = '') {
   const step = size * lh;
   const placed = [];
   const usedH = cols.map(() => 0);
@@ -111,7 +112,9 @@ export function flow(text, cols, fontStr, size, lh, measure) {
   const cut = p < paras.length;
   if (cut && placed.length) {
     const last = placed[placed.length - 1];
-    last.text = ellipsize(last.text, last.w, fontStr, measure);
+    const tail = more ? ' ' + more : '';
+    const room = last.w - (tail ? measure(tail, fontStr) : 0);
+    last.text = tail && room > last.w * 0.3 ? ellipsize(last.text, room, fontStr, measure) + tail : ellipsize(last.text, last.w, fontStr, measure);
     last.end = true;
   }
   return { placed, cut, usedH };

@@ -42,11 +42,12 @@ export function serve(dir = path.resolve(root, process.env.NP_DIST || 'dist'), p
     res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' });
     fs.createReadStream(file).pipe(res);
   });
-  // Our ports are 4981 to 4989. The tests use 4983 to 4988.
-  const ports = port ? [port] : [4983, 4984, 4985, 4986, 4987, 4988];
+  // Our ports are 4981 to 4989. The tests use 4983 to 4988 unless NP_PORTS lists others (comma separated).
+  const listed = (process.env.NP_PORTS || '').split(',').map(Number).filter(Boolean);
+  const ports = port ? [port] : listed.length ? listed : [4983, 4984, 4985, 4986, 4987, 4988];
   return new Promise((resolve, reject) => {
     const tryPort = (i) => {
-      if (i >= ports.length) return reject(new Error('No free port in 4983 to 4988.'));
+      if (i >= ports.length) return reject(new Error(`No free port in ${ports.join(', ')}.`));
       server.once('error', () => tryPort(i + 1));
       server.listen(ports[i], '127.0.0.1', () => {
         server.removeAllListeners('error');

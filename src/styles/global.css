@@ -111,7 +111,22 @@ textarea.ctl { padding: 8px 10px; line-height: 1.45; resize: vertical; }
   box-shadow: 0 1px 2px rgb(16 24 40 / .12), 0 12px 32px -12px rgb(16 24 40 / .28);
   background: #f3f0e7; touch-action: manipulation;
 }
-@media (max-width: 959px) { .np-wrap { width: 100%; } }
+/* Phones: full width. Tablets: short enough that the buttons under the page stay near. */
+@media (max-width: 959px) { .np-wrap { width: 100%; } .np { padding-bottom: 96px; } }
+@media (min-width: 600px) and (max-width: 959px) {
+  .np-wrap { width: min(100%, max(300px, calc((100vh - 280px) * var(--ratio, .7727)))); }
+  @supports (height: 100svh) { .np-wrap { width: min(100%, max(300px, calc((100svh - 280px) * var(--ratio, .7727)))); } }
+}
+/* Phone bar: shown while the page is scrolled out of view, so one thumb can get back to it or download. */
+.np-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  background: var(--card); border-top: 1px solid var(--line-strong); box-shadow: 0 -6px 20px -10px rgb(0 0 0 / .3);
+}
+.np-bar-msg { margin: 0 0 6px; font-size: .8125rem; text-align: center; color: var(--muted); }
+.np-bar-msg:empty { display: none; }
+.np-bar-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-width: 520px; margin: 0 auto; }
+@media (min-width: 960px) { .np-bar { display: none !important; } }
+@media print { .np-bar { display: none !important; } }
 #np-canvas { display: block; width: 100%; height: 100%; }
 .np-hits { position: absolute; inset: 0; }
 .np-hit { position: absolute; background: transparent; border: 0; padding: 0; margin: 0; cursor: text; border-radius: 3px; }
@@ -127,7 +142,9 @@ textarea.ctl { padding: 8px 10px; line-height: 1.45; resize: vertical; }
 }
 .np-editor-label { font-size: .8125rem; font-weight: 650; color: var(--muted); }
 .np-editor textarea { font: 16px/1.4 var(--font-sans); width: 100%; padding: 6px 8px; border: 1px solid var(--edge); border-radius: 8px; background: var(--paper); color: var(--ink); resize: vertical; max-height: 50vh; }
-.np-editor .btn-sm { align-self: flex-end; }
+.np-editor-btns { display: flex; gap: 6px; }
+.np-editor-btns .btn-sm { min-height: 40px; }
+.np-editor-done { margin-left: auto; }
 .np-drop { position: absolute; inset: 0; display: grid; place-items: center; background: rgb(37 64 107 / .78); color: #fff; font-weight: 700; font-size: 1.125rem; pointer-events: none; border: 3px dashed #fff; }
 .np-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; justify-content: center; }
 .np-actions .btn-primary { min-width: 200px; }

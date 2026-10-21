@@ -142,6 +142,40 @@ test('flow: columns of different widths, cut with ellipsis', () => {
   assert.equal(ok.placed.length, 1);
 });
 
+test('flow: a cut story ends with "(continued on page 2)" when it fits', () => {
+  const f = '400 10px serif';
+  const cols = [{ x: 0, y: 0, w: 300, h: 26 }];
+  const r = flow('word '.repeat(200).trim(), cols, f, 10, 1.3, measure, '(continued on page 2)');
+  assert.equal(r.cut, true);
+  const last = r.placed.at(-1);
+  assert.ok(last.text.endsWith('… (continued on page 2)'), last.text);
+  assert.ok(measure(last.text, f) <= 300 + 0.01);
+  // Too narrow for the note: ellipsis only.
+  const narrow = flow('word '.repeat(50).trim(), [{ x: 0, y: 0, w: 60, h: 13 }], f, 10, 1.3, measure, '(continued on page 2)');
+  assert.ok(narrow.placed.at(-1).text.endsWith('…'));
+  assert.ok(!narrow.placed.at(-1).text.includes('continued'));
+});
+test('layout: story keeps clear bands; cut text is listed but still shown', () => {
+  const p = PRESETS.birthday;
+  const doc = { fields: { ...presetFields('birthday', p.name, p.n).fields, date: 'Wednesday, October 21, 2026' }, opts: {} };
+  const band = (250 * 1000) / 1080;
+  for (const t of TEMPLATE_IDS) {
+    const L = layout(t, 'story', doc, { main: 1, side: 1 }, measure);
+    for (const op of L.ops.slice(1)) {
+      const y0 = op.y ?? op.y1 ?? op.cy, y1 = op.t === 'text' ? op.y : (op.y ?? op.y2 ?? op.cy) + (op.h || 0);
+      if (y0 === undefined) continue;
+      assert.ok(y0 >= band - 0.01 && y1 <= L.H - band + 0.01, `${t} story ${op.t} in the app band: ${y0}..${y1}`);
+    }
+    for (const h of L.hits) assert.ok(h.y >= band - 0.01 && h.y + h.h <= L.H - band + 0.01, `${t} story hit in band`);
+  }
+  const long = { ...doc, fields: { ...doc.fields, body: 'A long story. '.repeat(300) } };
+  const L = layout('classic', 'square', long, { main: 1 }, measure);
+  assert.equal(L.cut.body, true);
+  assert.ok(!L.hidden.body);
+  assert.ok(L.ops.some((o) => o.t === 'text' && o.text.endsWith('(continued on page 2)')));
+  for (const f of Object.keys(L.cut)) assert.ok(!L.hidden[f], `${f} both cut and hidden`);
+});
+
 test('balance: columns share the text evenly and nothing is cut', () => {
   const f = '400 10px serif';
   const text = 'word '.repeat(60).trim();

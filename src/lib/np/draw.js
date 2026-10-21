@@ -120,7 +120,7 @@ export function paint(ctx, L, scale, photos = {}) {
         ctx.fillStyle = op.color;
         for (let i = 0; i < op.count; i++) {
           ctx.globalAlpha = 0.05 + r() * 0.12;
-          ctx.beginPath(); ctx.arc(r() * L.W, r() * L.H, 0.3 + r() * 1.1, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(op.x + r() * op.w, op.y + r() * op.h, 0.3 + r() * 1.1, 0, Math.PI * 2); ctx.fill();
         }
         ctx.globalAlpha = 1;
         break;
