@@ -2,11 +2,11 @@
 Reviewer: Lisbeth (independent; did not build it). Date: 2026-10-21. Base commit cfe54a0. Ports used: 4931 to 4936 only.
 
 ## Result
-No Critical or High findings. 9 accepted Medium ("should") findings, all fixed, tested and committed. Gate after fixes: `npm test` 19 passed, `npm run build` ok, `npm run build:bingemind` ok (network privacy test and 15-step UI test pass on the Bingemind build).
+No Critical or High findings. 10 accepted Medium ("should") findings, all fixed, tested and committed. Gate after fixes: `npm test` 19 passed, `npm run build` ok, `npm run build:bingemind` ok (network privacy test and 15-step UI test pass on the Bingemind build).
 
 | Lens | Report | Must | Should found / fixed |
 |---|---|---|---|
-| Maintainer | code-maintainer.md | 0 | 3 / 3 |
+| Maintainer | code-maintainer.md | 0 | 4 / 4 (incl. shared-link hash before analytics) |
 | Minimalism | code-minimalism.md | 0 | 0 (1 nice fixed) |
 | Regression | code-regression.md | 0 | 4 / 4 (overlaps maintainer on pHYs) |
 | Readability | code-readability.md | 0 | 1 / 1 |
@@ -25,9 +25,11 @@ No Critical or High findings. 9 accepted Medium ("should") findings, all fixed, 
 - 8be8858: 300 DPI pHYs chunk on Letter and A4 PNGs.
 - 6107808: removed unused `blockHeight`; README updated.
 - b6df83e: article section on printing many copies or a poster.
+- ed0d4ff: shared-link words are taken out of the address in <head>, before GA4 or AdSense (when switched on) could read location.href; test checks the hash is gone at DOM ready.
+- c8cb2c5: Share says the menu is open and clears on cancel (no stuck-looking button).
 
 ## Open (nice, not blocking)
 Print a blank page for classrooms; own logo as the name; back page; name swap across focus sessions; one real iPhone/Android/Firefox check (owner or Barney); `vintage()` duplicates the story solver.
 
 ## Comparison
-comparison/newspaper-front-page-maker.md: round 2 score ours 65/80 vs fakenewspaper.app 52, 101planners 46, jaguarpaw 30. Best tool for the core job: yes. Only domain strength is still lost (101planners).
+comparison/newspaper-front-page-maker.md: round 2 score ours 64/80 vs fakenewspaper.app 52, 101planners 46, jaguarpaw 30 (round 1: ours 58). Best tool for the core job: yes. Still lost to 101planners: content depth (8 vs 7) and domain strength. That file sits in the microtools root repo and is not committed (other agents have edits there).
